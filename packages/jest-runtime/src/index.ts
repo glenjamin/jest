@@ -58,6 +58,7 @@ import {
   deepCyclicCopy,
   invariant,
   isNonNullable,
+  tracker,
 } from 'jest-util';
 import {
   createOutsideJestVmPath,
@@ -908,6 +909,8 @@ export default class Runtime {
       modulePath = this._resolveCjsModule(from, moduleName);
     }
 
+    tracker.start(modulePath, "requireModule", { parent: from })
+
     if (this.unstable_shouldLoadAsEsm(modulePath)) {
       // Node includes more info in the message
       const error: NodeJS.ErrnoException = new Error(
@@ -931,6 +934,7 @@ export default class Runtime {
 
     const module = moduleRegistry.get(modulePath);
     if (module) {
+      tracker.end(modulePath, 'requireModule', { registry: true });
       return module.exports;
     }
 
@@ -961,6 +965,7 @@ export default class Runtime {
       throw error;
     }
 
+    tracker.end(modulePath, 'requireModule');
     return localModule.exports;
   }
 

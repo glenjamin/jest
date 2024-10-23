@@ -9,6 +9,8 @@
 import * as preRunMessage from './preRunMessage';
 import * as specialChars from './specialChars';
 
+export {tracker} from './tracking';
+
 export {default as clearLine} from './clearLine';
 export {default as createDirectory} from './createDirectory';
 export {default as ErrorWithStack} from './ErrorWithStack';

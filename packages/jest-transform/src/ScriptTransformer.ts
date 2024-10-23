@@ -24,6 +24,7 @@ import {
   isPromise,
   requireOrImportModule,
   tryRealpath,
+  tracker,
 } from 'jest-util';
 import handlePotentialSyntaxError from './enhanceUnexpectedTokenMessage';
 import {
@@ -484,19 +485,23 @@ class ScriptTransformer {
     content: string,
     options: ReducedTransformOptions,
   ): TransformResult {
+    tracker.start(filepath, "transformSource");
     const filename = tryRealpath(filepath);
     const {transformer, transformerConfig = {}} =
       this._getTransformer(filename) ?? {};
     const cacheFilePath = this._getFileCachePath(filename, content, options);
     const sourceMapPath = `${cacheFilePath}.map`;
     // Ignore cache if `config.cache` is set (--no-cache)
+    tracker.start(filepath, "readCodeCacheFile");
     const code = this._config.cache ? readCodeCacheFile(cacheFilePath) : null;
+    tracker.end(filepath, "readCodeCacheFile");
 
     if (code != null) {
       // This is broken: we return the code, and a path for the source map
       // directly from the cache. But, nothing ensures the source map actually
       // matches that source code. They could have gotten out-of-sync in case
       // two separate processes write concurrently to the same cache files.
+      tracker.end(filepath, "transformSource", {cached: true});
       return {
         code,
         originalCode: content,
@@ -513,6 +518,7 @@ class ScriptTransformer {
 
       assertSyncTransformer(transformer, this._getTransformPath(filename));
 
+      tracker.note(filepath, "transformSource", { transformed: true });
       processed = transformer.process(content, filename, {
         ...options,
         cacheFS: this._cacheFS,
@@ -523,7 +529,7 @@ class ScriptTransformer {
     }
 
     createDirectory(path.dirname(cacheFilePath));
-    return this._buildTransformResult(
+    const result = this._buildTransformResult(
       filename,
       cacheFilePath,
       content,
@@ -533,6 +539,8 @@ class ScriptTransformer {
       processed,
       sourceMapPath,
     );
+    tracker.end(filepath, "transformSource");
+    return result;
   }
 
   async transformSourceAsync(
@@ -540,6 +548,7 @@ class ScriptTransformer {
     content: string,
     options: ReducedTransformOptions,
   ): Promise<TransformResult> {
+    tracker.start(filepath, "transformSourceAsync");
     const filename = tryRealpath(filepath);
     const {transformer, transformerConfig = {}} =
       this._getTransformer(filename) ?? {};
@@ -550,13 +559,16 @@ class ScriptTransformer {
     );
     const sourceMapPath = `${cacheFilePath}.map`;
     // Ignore cache if `config.cache` is set (--no-cache)
+    tracker.start(filepath, "readCodeCacheFile");
     const code = this._config.cache ? readCodeCacheFile(cacheFilePath) : null;
+    tracker.end(filepath, "readCodeCacheFile");
 
     if (code != null) {
       // This is broken: we return the code, and a path for the source map
       // directly from the cache. But, nothing ensures the source map actually
       // matches that source code. They could have gotten out-of-sync in case
       // two separate processes write concurrently to the same cache files.
+      tracker.end(filepath, "transformSourceAsync", {cached: true});
       return {
         code,
         originalCode: content,
@@ -588,7 +600,7 @@ class ScriptTransformer {
     }
 
     createDirectory(path.dirname(cacheFilePath));
-    return this._buildTransformResult(
+    const result = this._buildTransformResult(
       filename,
       cacheFilePath,
       content,
@@ -598,6 +610,8 @@ class ScriptTransformer {
       processed,
       sourceMapPath,
     );
+    tracker.end(filepath, "transformSourceAsync");
+    return result;
   }
 
   private async _transformAndBuildScriptAsync(
